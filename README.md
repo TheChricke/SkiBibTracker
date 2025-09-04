@@ -1,0 +1,6 @@
+# SkiBibTracker
+This is a python program that uses the yolo framework for detecting skiers bibs and outputs after post processing the digits in the bib. The training data consists of around 3200 images fetched from competitions streamed on Yle Areena. The classes are digits 0-9 and the post processing method merges closely related bounding boxes for the output.
+
+The program was developed for use in a mobile app. The model should be converted to tflite and metadta should be added to the tflite file and the preprocessing and postprocessing should be converted to Java (for use in Android) before deploying to mobile. However, after testing on Samsung S21 Plus the mobel just runs a bit too slow on mobile (~90ms inference and ~30ms pre processing and ~5ms post processing). Both the inference and pre processing (the conversion from Android ImageProxy to Bytebuffer) are hardware accelerated but the inference time is still too slow. The inference would need be quite fast for the post processing to work since the skiers body moves up and down quite fast (the digits are frequently out of sight). Both yolov11-nano and yolov11-small were tested. Yolov11-nano were faster but didnt provide enough accuracy, and yolov11-small was more accurate but run much slower on mobile.
+
+The capability and idea of the program is still shown with the python program in this repo.
