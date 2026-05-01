@@ -4,8 +4,12 @@ The program was developed for use in a mobile app. The model should be converted
 
 The capability and idea of the program is still shown with the python program in this repo.
 
-Dependencies: pip install ultralytics
+Dependencies:
+-pip install ultralytics
 
-Run yolo train data=/pathto/customdataFI.yaml model=yolo11s.pt epochs=7 lr0=0.01 cache=False for training
+Training:
+-yolo train data=/pathto/customdataFI.yaml model=yolo11s.pt epochs=7 lr0=0.01 cache=False for training
 
-Run python ./yoloVideo.py for postprocessing and inference
+Inference:
+-Replace the runs_path and video_path in yoloVideo.py
+-Run python ./yoloVideo.py for postprocessing and inference
