@@ -2,3 +2,4 @@ labelimg/
 runs/
 trainFI/
 VideoCollector/
+runTfLite.py

@@ -3,23 +3,24 @@ import torch
 import re
 from ultralytics import YOLO
 from pathlib import Path
-
-# Load the YOLO model (Choose the right model: yolov8n.pt, yolov8s.pt, etc.)
-MERGE_THRESHOLD = 15  # Pixels
-MERGE_Y_THRESHOLD = 30  # Pixels
-
 from collections import defaultdict
 
+MERGE_THRESHOLD = 15  # Pixels
+MERGE_Y_THRESHOLD = 30
+
+
+'''
+Bounding Box tracking
+'''
 class TrackedBox:
     def __init__(self, label, bbox):
-        self.label = label            # integer label detected by YOLO
-        self.bbox = bbox              # (x1, y1, x2, y2)
-        self.frames_found = 1         # how many frames this box has been detected consistently
+        self.label = label
+        self.bbox = bbox 
+        self.frames_found = 1         # how many frames this box has been detected 
         self.pending = False          # waiting for merge with another number
         self.found = False            # considered stable enough to be "found"
     
     def update_bbox(self, bbox):
-        # You could do averaging or just replace for now
         self.bbox = bbox
 
 def process_frame(merged_boxes, tracked_boxes, found_boxes, threshold_found=8):
@@ -37,7 +38,7 @@ def process_frame(merged_boxes, tracked_boxes, found_boxes, threshold_found=8):
         x1, y1, x2, y2, label = bbox
         label_counts[label].append((x1, y1, x2, y2))
 
-    # Mark duplicates as pending
+    # Mark duplicates as pending, there should really be no duplicates among bib numbers, but there can be temporary duplicates if it has detect for example only the first digit in 12 and another bib with number 1
     for label, boxes in label_counts.items():
         if len(boxes) > 1:
             # Multiple detections of same label -> all pending
@@ -45,7 +46,6 @@ def process_frame(merged_boxes, tracked_boxes, found_boxes, threshold_found=8):
                 if label in tracked_boxes:
                     tb = tracked_boxes[label]
                     tb.pending = True
-                    # You might want to update bbox as well? Let's keep first box for now
                 else:
                     tb = TrackedBox(label, box)
                     tb.pending = True
@@ -56,7 +56,7 @@ def process_frame(merged_boxes, tracked_boxes, found_boxes, threshold_found=8):
             if label in tracked_boxes:
                 tb = tracked_boxes[label]
                 tb.pending = False
-                tb.frames_found = min(tb.frames_found + 1, threshold_found)  # increment capped at threshold
+                tb.frames_found = min(tb.frames_found + 1, threshold_found)
                 tb.update_bbox(box)
             elif label in found_boxes:
                 # Already found, keep it stable in found_boxes, update bbox?
@@ -66,7 +66,7 @@ def process_frame(merged_boxes, tracked_boxes, found_boxes, threshold_found=8):
                 tb = TrackedBox(label, box)
                 tracked_boxes[label] = tb
 
-    # Decrement frames_found for labels not found in this frame
+    # Decrement frames_found for labels not found in this frame, incrementing and decrementing frames_found is to increase stability and avoid false positives
     current_labels = set(label_counts.keys())
     for label in list(tracked_boxes.keys()):
         if label not in current_labels:
@@ -90,6 +90,10 @@ found_boxes = {}
 threshold_tracking = 4
 threshold_found = 15
 
+
+'''
+Merge boxes
+'''
 def merge_boxes(bboxes, classes, x_threshold, y_threshold):
     """Merges bounding boxes that are close together and concatenates their labels."""
     if not bboxes:
@@ -134,17 +138,18 @@ def get_latest_train_folder(base_path):
     print(f"[INFO] Loaded model from folder: {latest}")
     return latest
 
-# Usage:
-runs_path = "/home/chricke/Projects/runs/detect"
+
+
+'''
+Usage
+'''
+runs_path = "/home/chricke/Projects/SkiBibTracker/runs/detect"
 latest_train_folder = get_latest_train_folder(runs_path)
 best_model_path = latest_train_folder / "weights" / "best.pt"
 
-# Load the model
 model = YOLO(str(best_model_path))
 
-# Open the video file
-#/home/chricke/Projects/VideoCollector/output_test_mod.mp4
-video_path = "/home/chricke/Projects/test1.webm"
+video_path = "/home/chricke/Projects/SkiBibTracker/test1.webm"
 cap = cv2.VideoCapture(video_path)
 
 # Get video properties
@@ -154,10 +159,8 @@ fps = int(cap.get(cv2.CAP_PROP_FPS))
 if fps > 120 or fps <= 0:  # unrealistic, so override
     fps = 60  # or the actual FPS of your video
 
-# Create a VideoWriter to save the output
-out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
+out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 60, (frame_width, frame_height))
 
-# Create a resizable window
 cv2.namedWindow("YOLOv11 Video", cv2.WINDOW_NORMAL)
 cv2.resizeWindow("YOLOv11 Video", 1000, 1000)
 
@@ -165,20 +168,20 @@ cv2.resizeWindow("YOLOv11 Video", 1000, 1000)
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
-        break  # Stop if the video ends
+        break
 
     # Run YOLOv11 model on the frame
     results = model(frame, conf=0.7, iou=0.5)
 
     # Extract detections
     for result in results:
-        xyxy = result.boxes.xyxy  # Bounding box in (x_min, y_min, x_max, y_max) format
+        xyxy = result.boxes.xyxy 
         classes = result.boxes.cls.tolist()  # Class indices (1D tensor)
         conf = result.boxes.conf  # Confidence scores (1D tensor)
 
         bboxes = []
-        for box in xyxy:  # Loop over detections
-            x1, y1, x2, y2 = map(int, box[:4].tolist())  # Convert tensor to integers
+        for box in xyxy:
+            x1, y1, x2, y2 = map(int, box[:4].tolist())
             bboxes.append((x1, y1, x2, y2))
 
             # Merge overlapping/close bounding boxes and concatenate labels
@@ -192,18 +195,13 @@ while cap.isOpened():
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 255, 0), 6)
     print("Found labels:", list(found_boxes.keys()))
-    # Show the frame
     cv2.imshow("YOLOv11 Video", frame)
-    
-    # Save the frame to the output video
     out.write(frame)
 
     delay = int(1000 / fps)
-    # Press 'q' to exit
     if cv2.waitKey(delay) & 0xFF == ord('q'):
         break
 
-# Release resources
 cap.release()
 out.release()
 cv2.destroyAllWindows()
